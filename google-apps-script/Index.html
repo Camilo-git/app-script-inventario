@@ -1,0 +1,1450 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inventario Diario · Oficina de Medios Educativos</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    body { font-family: 'Public Sans', system-ui, sans-serif; background: #f8fafc; color: #0f172a; }
+    h1, h2, h3 { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+    .font-mono { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
+    @media print { .no-print { display: none !important; } body { background: #fff; } }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+  <!-- BARRA SUPERIOR -->
+  <header class="bg-white border-b border-slate-200 px-4 sm:px-8 h-14 flex items-center justify-between gap-4 sticky top-0 z-30 no-print">
+    <div class="flex items-center gap-3">
+      <a href="#cierre" onclick="cambiarVista('cierre'); return false;" class="font-bold text-slate-900 text-base sm:text-lg whitespace-nowrap">Medios Educativos</a>
+      <span id="badge-conexion" class="hidden sm:inline-block text-xs px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 font-medium">Conectando a Sheets...</span>
+    </div>
+    <nav class="flex items-center gap-4 sm:gap-6 text-xs sm:text-sm font-medium text-slate-600 overflow-x-auto">
+      <button onclick="cambiarVista('cierre')" id="tab-cierre" class="py-4 border-b-2 border-blue-900 text-slate-900 font-semibold whitespace-nowrap">Cierre diario</button>
+      <button onclick="cambiarVista('novedades')" id="tab-novedades" class="py-4 border-b-2 border-transparent hover:text-slate-900 whitespace-nowrap">Novedades</button>
+      <button onclick="cambiarVista('apertura')" id="tab-apertura" class="py-4 border-b-2 border-transparent hover:text-slate-900 whitespace-nowrap">Apertura</button>
+      <button onclick="cambiarVista('catalogo')" id="tab-catalogo" class="py-4 border-b-2 border-transparent hover:text-slate-900 whitespace-nowrap">Catálogo</button>
+      <button onclick="cambiarVista('historial')" id="tab-historial" class="py-4 border-b-2 border-transparent hover:text-slate-900 whitespace-nowrap">Historial</button>
+    </nav>
+    <div class="flex items-center gap-2 shrink-0">
+      <button onclick="abrirModalNovedad()" class="px-3.5 py-2 text-xs font-semibold text-white bg-blue-900 rounded-lg hover:bg-blue-800 whitespace-nowrap">
+        Registrar novedad
+      </button>
+    </div>
+  </header>
+
+  <!-- CONTENIDO PRINCIPAL -->
+  <main class="max-w-[1280px] w-full mx-auto px-4 sm:px-8 py-6 space-y-6 flex-1">
+    <!-- SUB-BARRA DE ESTADO -->
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-4 border-b border-slate-200 text-xs text-slate-600 no-print">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="font-medium text-slate-800">Oficina de Medios Educativos</span>
+        <span>·</span>
+        <span id="top-fecha" class="font-mono"></span>
+        <span>·</span>
+        <span><strong id="top-count-abiertas" class="font-mono text-slate-900">0</strong> novedades abiertas vigentes</span>
+        <span>·</span>
+        <span>Cierre hoy: <strong id="top-estado-cierre" class="text-slate-900">En curso</strong></span>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <span id="usuario-activo" class="font-mono text-slate-800 bg-white border border-slate-300 rounded-lg px-2.5 py-1">Cuenta activa: verificando...</span>
+      </div>
+    </div>
+
+    <div id="alerta-sistema" class="hidden rounded-lg border px-4 py-3 text-xs font-medium flex items-center justify-between no-print"></div>
+
+    <!-- ==================== 1. VISTA CIERRE DIARIO ==================== -->
+    <section id="vista-cierre" class="space-y-6">
+      <div class="bg-white border border-slate-200 rounded-xl p-6">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-slate-200">
+          <div>
+            <div class="flex items-center gap-2 text-xs text-slate-500">
+              <span>Flujo central obligatorio</span>
+              <span>·</span>
+              <span id="fecha-cierre-label" class="font-mono"></span>
+              <span>·</span>
+              <span id="badge-estado-cierre" class="font-medium text-amber-700">En preparación para firma</span>
+            </div>
+            <h1 class="text-2xl font-bold text-slate-900 mt-1">Inventario de cierre diario</h1>
+            <p class="text-sm text-slate-600 mt-1 max-w-3xl">
+              Las novedades abiertas se precargan automáticamente de días anteriores y del turno actual. Verifique las unidades presentes, justifique cualquier ausencia y confirme el cierre con el responsable de turno.
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2.5 no-print shrink-0">
+            <button id="btn-marcar-restantes" onclick="marcarPendientesEnOficina()" class="px-3.5 py-2 text-xs font-medium text-slate-800 bg-slate-100 border border-slate-300 rounded-lg hover:bg-slate-200">
+              ✓ Marcar pendientes sin novedad como En oficina
+            </button>
+            <button onclick="descargarCsvCierre()" class="px-3.5 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">
+              Descargar CSV
+            </button>
+            <button onclick="window.print()" class="px-3.5 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">
+              Acta PDF / Imprimir
+            </button>
+          </div>
+        </div>
+
+        <!-- 4 KPIs CIERRE -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-6 pt-6">
+          <div>
+            <p class="text-xs text-slate-500">Progreso de verificación</p>
+            <p id="kpi-progreso" class="text-2xl font-bold font-mono text-slate-900 mt-1">0 / 0</p>
+            <p id="kpi-progreso-sub" class="text-xs text-slate-500 mt-0.5">Pendientes por resolver</p>
+          </div>
+          <div class="lg:border-l lg:border-slate-200 lg:pl-6">
+            <p class="text-xs text-slate-500">Novedades arrastradas / vigentes</p>
+            <p id="kpi-novedades" class="text-2xl font-bold font-mono text-slate-900 mt-1">0</p>
+            <p class="text-xs text-slate-500 mt-0.5">Códigos con préstamo, pérdida o salida abierta</p>
+          </div>
+          <div class="lg:border-l lg:border-slate-200 lg:pl-6">
+            <p class="text-xs text-slate-500">Ausencias sin justificar (RF-07)</p>
+            <p id="kpi-sin-justificar" class="text-2xl font-bold font-mono text-emerald-700 mt-1">0</p>
+            <p id="kpi-sin-justificar-sub" class="text-xs text-slate-500 mt-0.5">Ninguna ausencia sin soporte</p>
+          </div>
+          <div class="lg:border-l lg:border-slate-200 lg:pl-6">
+            <p class="text-xs text-slate-500">Estado de firma responsable</p>
+            <p id="kpi-estado-firma" class="text-base font-semibold text-slate-900 mt-1.5">Pendiente de completar</p>
+            <p id="kpi-sello-firma" class="text-xs font-mono text-slate-500 mt-0.5">Requiere 0 ítems pendientes</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUB-PESTAÑAS Y BUSCADOR DE CIERRE DIARIO -->
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
+        <div class="flex flex-wrap items-center gap-1 p-1 bg-slate-200/70 rounded-lg">
+          <button onclick="cambiarFiltroCierre('todos')" id="fc-todos" class="px-3 py-1.5 text-xs font-medium rounded-md bg-white text-slate-900 shadow-xs">Todos (15)</button>
+          <button onclick="cambiarFiltroCierre('pendientes')" id="fc-pendientes" class="px-3 py-1.5 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900">Por resolver (0)</button>
+          <button onclick="cambiarFiltroCierre('excepciones')" id="fc-excepciones" class="px-3 py-1.5 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900">Con ausencia o novedad</button>
+          <button onclick="cambiarFiltroCierre('audiovisuales')" id="fc-audiovisuales" class="px-3 py-1.5 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900">Audiovisuales</button>
+          <button onclick="cambiarFiltroCierre('deportivos')" id="fc-deportivos" class="px-3 py-1.5 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900">Deportivos</button>
+        </div>
+        <div class="relative w-full md:w-72">
+          <input id="busqueda-cierre" type="search" oninput="renderizarTodo()" placeholder="Filtrar por código o nombre..." class="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs text-slate-900 focus:border-blue-700 focus:outline-none" />
+        </div>
+      </div>
+
+      <!-- 1. TABLA AUDIOVISUALES -->
+      <div id="bloque-tabla-audiovisuales" class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h2 class="text-base font-semibold text-slate-900">1. Equipos audiovisuales · Control por código individual</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Cada equipo tiene código único. Si no está en la oficina, debe tener exactamente una novedad abierta asociada.</p>
+          </div>
+          <span id="contador-filas-av" class="text-xs font-mono text-slate-500"></span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr class="border-b border-slate-200 bg-slate-50/80 text-xs font-medium text-slate-600">
+                <th class="py-3 px-4">Código</th>
+                <th class="py-3 px-4">Equipo y ubicación</th>
+                <th class="py-3 px-4">Novedad abierta precargada (RF-06)</th>
+                <th class="py-3 px-4">Resultado físico (RF-05)</th>
+                <th class="py-3 px-4 text-right no-print">Validación / Acción</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-audiovisuales-body" class="divide-y divide-slate-200"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 2. TABLA DEPORTIVOS -->
+      <div id="bloque-tabla-deportivos" class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h2 class="text-base font-semibold text-slate-900">2. Elementos deportivos · Control por código general y cantidad</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Registre cuántas unidades están físicamente en la oficina; la diferencia frente al total debe coincidir con las unidades en novedades abiertas.</p>
+          </div>
+          <span id="contador-filas-dep" class="text-xs font-mono text-slate-500"></span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr class="border-b border-slate-200 bg-slate-50/80 text-xs font-medium text-slate-600">
+                <th class="py-3 px-4">Código</th>
+                <th class="py-3 px-4">Elemento deportivo</th>
+                <th class="py-3 px-4 text-right">Total</th>
+                <th class="py-3 px-4">Unidades afuera con novedad</th>
+                <th class="py-3 px-4 text-right">Conteo en oficina</th>
+                <th class="py-3 px-4 text-right no-print">Validación / Acción</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-deportivos-body" class="divide-y divide-slate-200"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 3. FIRMA DEL CIERRE -->
+      <div class="bg-white border border-slate-200 rounded-xl p-6 space-y-4 no-print">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-200">
+          <div>
+            <h2 class="text-base font-semibold text-slate-900">3. Confirmación y firma digital del responsable de turno (RF-08)</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Una vez firmado el cierre diario, el registro queda bloqueado y las novedades abiertas se conservarán para mañana.</p>
+          </div>
+        </div>
+        <div id="caja-requisitos-pendientes" class="hidden rounded-lg border border-amber-200 bg-amber-50/70 p-4 text-xs text-amber-900 space-y-1"></div>
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1.5">Observaciones generales del cierre de turno</label>
+          <textarea id="obs-cierre" rows="2" placeholder="Anote observaciones relevantes del turno..." class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"></textarea>
+        </div>
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-2">
+          <label class="inline-flex items-start gap-2.5 text-xs text-slate-700 cursor-pointer">
+            <input id="chk-declaracion" type="checkbox" onchange="renderizarTodo()" class="mt-0.5 rounded border-slate-300 text-blue-900" />
+            <span>Confirmo que el inventario fue revisado físicamente en la oficina y que toda unidad ausente cuenta con su novedad registrada.</span>
+          </label>
+          <button onclick="confirmarYFirmarCierre()" id="btn-firmar" class="px-5 py-2.5 text-xs font-semibold text-white bg-blue-900 rounded-lg hover:bg-blue-800 disabled:opacity-45 disabled:cursor-not-allowed whitespace-nowrap">
+            Firmar y bloquear cierre diario
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 2. VISTA NOVEDADES ==================== -->
+    <section id="vista-novedades" class="hidden space-y-6">
+      <div class="bg-white border border-slate-200 rounded-xl p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
+          <div>
+            <p class="text-xs text-slate-500">Operación durante el día · Préstamos, órdenes de salida y pérdidas</p>
+            <h1 class="text-2xl font-bold text-slate-900 mt-1">Registro y control de novedades</h1>
+            <p class="text-sm text-slate-600 mt-1 max-w-2xl">Toda novedad abierta persiste automáticamente entre turnos hasta que se registre la devolución o resolución del elemento.</p>
+          </div>
+          <button onclick="abrirModalNovedad()" class="px-4 py-2.5 text-xs font-semibold text-white bg-blue-900 rounded-lg hover:bg-blue-800 whitespace-nowrap shrink-0">
+            + Nueva novedad
+          </button>
+        </div>
+
+        <!-- 4 KPIs NOVEDADES -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-6 pt-6">
+          <div>
+            <p class="text-xs text-slate-500">Novedades abiertas hoy</p>
+            <p id="nov-kpi-abiertas" class="text-2xl font-bold font-mono text-slate-900 mt-1">0</p>
+            <p id="nov-kpi-sub" class="text-xs text-slate-500 mt-0.5">0 préstamos · 0 salidas</p>
+          </div>
+          <div class="lg:border-l lg:border-slate-200 lg:pl-6">
+            <p class="text-xs text-slate-500">Pérdidas sin resolver</p>
+            <p id="nov-kpi-perdidas" class="text-2xl font-bold font-mono text-slate-900 mt-1">0</p>
+            <p class="text-xs text-slate-500 mt-0.5">Pendientes de reposición o baja</p>
+          </div>
+          <div class="lg:border-l lg:border-slate-200 lg:pl-6">
+            <p class="text-xs text-slate-500">Antigüedad &ge; <span id="lbl-umbral-nov">3</span> días (RF-13)</p>
+            <p id="nov-kpi-antiguas" class="text-2xl font-bold font-mono text-emerald-700 mt-1">0</p>
+            <p class="text-xs text-slate-500 mt-0.5">Visibles en alerta para jefatura</p>
+          </div>
+          <div class="lg:border-l lg:border-slate-200 lg:pl-6">
+            <p class="text-xs text-slate-500">Órdenes de salida vigentes</p>
+            <p id="nov-kpi-salidas" class="text-2xl font-bold font-mono text-slate-900 mt-1">0</p>
+            <p class="text-xs text-slate-500 mt-0.5">Con soporte de autorización externa</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUB-PESTAÑAS Y BUSCADOR DE NOVEDADES -->
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="flex items-center gap-1 p-1 bg-slate-200/70 rounded-lg">
+            <button onclick="cambiarFiltroNovEstado('abiertas')" id="fne-abiertas" class="px-3 py-1.5 text-xs font-medium rounded-md bg-white text-slate-900 shadow-xs">Abiertas</button>
+            <button onclick="cambiarFiltroNovEstado('cerradas')" id="fne-cerradas" class="px-3 py-1.5 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900">Cerradas</button>
+            <button onclick="cambiarFiltroNovEstado('todas')" id="fne-todas" class="px-3 py-1.5 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900">Todas</button>
+          </div>
+          <div class="flex items-center gap-1 p-1 bg-slate-200/70 rounded-lg">
+            <button onclick="cambiarFiltroNovTipo('todos')" id="fnt-todos" class="px-3 py-1.5 text-xs font-medium rounded-md bg-white text-slate-900 shadow-xs">Todos los tipos</button>
+            <button onclick="cambiarFiltroNovTipo('prestamo')" id="fnt-prestamo" class="px-3 py-1.5 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900">Préstamos</button>
+            <button onclick="cambiarFiltroNovTipo('orden_salida')" id="fnt-orden_salida" class="px-3 py-1.5 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900">Órdenes de salida</button>
+            <button onclick="cambiarFiltroNovTipo('perdida')" id="fnt-perdida" class="px-3 py-1.5 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900">Pérdidas</button>
+          </div>
+        </div>
+        <div class="relative w-full lg:w-72">
+          <input id="busqueda-novedades" type="search" oninput="renderizarTodo()" placeholder="Buscar código, solicitante o evento..." class="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs text-slate-900 focus:border-blue-700 focus:outline-none" />
+        </div>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr class="border-b border-slate-200 bg-slate-50/80 text-xs font-medium text-slate-600">
+                <th class="py-3 px-4">ID / Fecha</th>
+                <th class="py-3 px-4">Elemento y cantidad</th>
+                <th class="py-3 px-4">Tipo y detalle</th>
+                <th class="py-3 px-4">Solicitante</th>
+                <th class="py-3 px-4">Trazabilidad auxiliar</th>
+                <th class="py-3 px-4 text-right">Estado / Acción</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-novedades-body" class="divide-y divide-slate-200"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 3. VISTA APERTURA ==================== -->
+    <section id="vista-apertura" class="hidden space-y-6">
+      <div class="bg-white border border-slate-200 rounded-xl p-6 space-y-5">
+        <div class="pb-5 border-b border-slate-200">
+          <p class="text-xs text-slate-500">Control preventivo matutino · Recomendable pero no bloqueante (RF-09)</p>
+          <h1 class="text-2xl font-bold text-slate-900 mt-1">Verificación opcional de apertura de turno</h1>
+          <p class="text-sm text-slate-600 mt-1 max-w-3xl">Permite al auxiliar de la mañana contrastar rápidamente las existencias físicas frente al último cierre firmado.</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr class="border-b border-slate-200 bg-slate-50/80 text-xs font-medium text-slate-600">
+                <th class="py-2.5 px-4">Código</th>
+                <th class="py-2.5 px-4">Elemento</th>
+                <th class="py-2.5 px-4">Ubicación</th>
+                <th class="py-2.5 px-4 text-right">Esperado hoy en sala</th>
+                <th class="py-2.5 px-4 text-right">Chequeo rápido</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-apertura-body" class="divide-y divide-slate-200"></tbody>
+          </table>
+        </div>
+        <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 border-t border-slate-200 pt-4">
+          <div class="flex-1">
+            <label class="block text-xs font-medium text-slate-700 mb-1">Observaciones de apertura</label>
+            <input id="obs-apertura" type="text" placeholder="Ej. Estanterías revisadas al iniciar atención 7:30 a. m." class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+          </div>
+          <button onclick="guardarAperturaSheets()" class="px-4 py-2.5 text-xs font-semibold text-white bg-blue-900 rounded-lg hover:bg-blue-800 whitespace-nowrap">
+            Guardar constancia de apertura
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-200">
+          <h2 class="text-base font-semibold text-slate-900">Registro reciente de verificaciones de apertura</h2>
+        </div>
+        <div id="lista-aperturas-body" class="divide-y divide-slate-200"></div>
+      </div>
+    </section>
+
+    <!-- ==================== 4. VISTA CATÁLOGO ==================== -->
+    <section id="vista-catalogo" class="hidden space-y-6">
+      <div class="bg-white border border-slate-200 rounded-xl p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
+          <div>
+            <p class="text-xs text-slate-500"> Pestaña 1 de Google Sheets · Elementos</p>
+            <h1 class="text-2xl font-bold text-slate-900 mt-1">Catálogo maestro de elementos</h1>
+            <p class="text-sm text-slate-600 mt-1 max-w-2xl">Administre los equipos audiovisuales de control individual y los implementos deportivos controlados por cantidad total.</p>
+          </div>
+          <div class="flex items-center gap-2.5 shrink-0">
+            <button onclick="descargarCsvCatalogo()" class="px-3.5 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">
+              Exportar catálogo CSV
+            </button>
+            <button onclick="abrirModalElemento()" class="px-4 py-2 text-xs font-semibold text-white bg-blue-900 rounded-lg hover:bg-blue-800">
+              + Nuevo elemento
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-6 pt-6">
+          <div>
+            <p class="text-xs text-slate-500">Códigos activos</p>
+            <p id="cat-kpi-activos" class="text-2xl font-bold font-mono text-slate-900 mt-1">0</p>
+          </div>
+          <div class="lg:border-l lg:border-slate-200 lg:pl-6">
+            <p class="text-xs text-slate-500">Equipos audiovisuales</p>
+            <p id="cat-kpi-av" class="text-2xl font-bold font-mono text-slate-900 mt-1">0</p>
+          </div>
+          <div class="lg:border-l lg:border-slate-200 lg:pl-6">
+            <p class="text-xs text-slate-500">Grupos deportivos</p>
+            <p id="cat-kpi-dep" class="text-2xl font-bold font-mono text-slate-900 mt-1">0</p>
+          </div>
+          <div class="lg:border-l lg:border-slate-200 lg:pl-6">
+            <p class="text-xs text-slate-500">Unidades deportivas totales</p>
+            <p id="cat-kpi-unid" class="text-2xl font-bold font-mono text-slate-900 mt-1">0</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUB-PESTAÑAS Y BUSCADOR DE CATÁLOGO -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="flex items-center gap-1 p-1 bg-slate-200/70 rounded-lg">
+            <button onclick="cambiarFiltroCat('todos')" id="fcat-todos" class="px-3 py-1.5 text-xs font-medium rounded-md bg-white text-slate-900 shadow-xs">Todos</button>
+            <button onclick="cambiarFiltroCat('audiovisual')" id="fcat-audiovisual" class="px-3 py-1.5 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900">Audiovisuales</button>
+            <button onclick="cambiarFiltroCat('deportivo')" id="fcat-deportivo" class="px-3 py-1.5 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900">Deportivos</button>
+          </div>
+          <label class="inline-flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+            <input id="chk-mostrar-inactivos" type="checkbox" onchange="renderizarTodo()" class="rounded border-slate-300 text-blue-900" />
+            <span>Mostrar inactivos</span>
+          </label>
+        </div>
+        <div class="relative w-full sm:w-72">
+          <input id="busqueda-catalogo" type="search" oninput="renderizarTodo()" placeholder="Buscar por código, nombre, tipo o estante..." class="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs text-slate-900 focus:border-blue-700 focus:outline-none" />
+        </div>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr class="border-b border-slate-200 bg-slate-50/80 text-xs font-medium text-slate-600">
+                <th class="py-3 px-4">Código</th>
+                <th class="py-3 px-4">Nombre y ubicación</th>
+                <th class="py-3 px-4">Categoría</th>
+                <th class="py-3 px-4">Estado físico</th>
+                <th class="py-3 px-4 text-right">Cantidad total</th>
+                <th class="py-3 px-4 text-right">Disponibles hoy</th>
+                <th class="py-3 px-4 text-right">Acción</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-catalogo-body" class="divide-y divide-slate-200"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 5. VISTA HISTORIAL ==================== -->
+    <section id="vista-historial" class="hidden space-y-6">
+      <div class="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+          <div>
+            <p class="text-xs text-slate-500">Consultas, trazabilidad e indicadores de gestión · RF-10 y RF-13</p>
+            <h1 class="text-2xl font-bold text-slate-900 mt-1">Historial, cierres firmados y avisos a jefatura</h1>
+          </div>
+          <div class="flex items-center gap-3">
+            <label class="text-xs text-slate-600">Escalar tras (días):</label>
+            <input id="input-umbral-dias" type="number" min="1" max="30" value="3" onchange="cambiarUmbralDias(this.value)" class="w-16 rounded-md border border-slate-300 px-2 py-1 text-xs font-mono text-center" />
+            <button onclick="notificarJefaturaSheets()" class="px-3 py-1.5 text-xs font-medium text-amber-950 bg-amber-100 border border-amber-300 rounded-lg hover:bg-amber-200">
+              Notificar a Jefatura (RF-13)
+            </button>
+          </div>
+        </div>
+
+        <!-- SUB-PESTAÑAS DE HISTORIAL -->
+        <div class="flex flex-wrap items-center gap-1 p-1 bg-slate-200/70 rounded-lg w-fit">
+          <button onclick="cambiarSubHistorial('cierres')" id="sh-cierres" class="px-3.5 py-1.5 text-xs font-medium rounded-md bg-white text-slate-900 shadow-xs">Actas de cierre diario</button>
+          <button onclick="cambiarSubHistorial('consulta')" id="sh-consulta" class="px-3.5 py-1.5 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900">Consulta histórica (RF-10)</button>
+          <button onclick="cambiarSubHistorial('auditoria')" id="sh-auditoria" class="px-3.5 py-1.5 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900">Auditoría de acciones</button>
+        </div>
+      </div>
+
+      <!-- SUB-VISTA ACTAS CIERRES -->
+      <div id="subvista-hist-cierres" class="bg-white border border-slate-200 rounded-xl p-6">
+        <h2 class="text-base font-bold text-slate-900 mb-4">Actas de Cierre Diario Firmadas en Google Sheets</h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr class="border-b border-slate-200 bg-slate-50 text-xs text-slate-600">
+                <th class="py-2.5 px-3">ID Acta</th>
+                <th class="py-2.5 px-3">Fecha / Hora</th>
+                <th class="py-2.5 px-3">Responsable</th>
+                <th class="py-2.5 px-3">Sello Digital</th>
+                <th class="py-2.5 px-3">Observaciones</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-cierres-body" class="divide-y divide-slate-200"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SUB-VISTA CONSULTA HISTÓRICA RF-10 -->
+      <div id="subvista-hist-consulta" class="hidden bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div class="p-6 border-b border-slate-200 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+          <div class="md:col-span-2">
+            <label class="block text-xs font-medium text-slate-700 mb-1">Elemento, código o solicitante</label>
+            <input id="busqueda-hist-nov" type="search" oninput="renderizarTodo()" placeholder="Ej. AV-POR-003, docente, estudiante..." class="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-700 mb-1">Fecha desde</label>
+            <input id="hist-fecha-desde" type="date" onchange="renderizarTodo()" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-700 mb-1">Fecha hasta</label>
+            <input id="hist-fecha-hasta" type="date" onchange="renderizarTodo()" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono" />
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="border-b border-slate-200 bg-slate-50 text-slate-600">
+                <th class="py-3 px-4">Novedad</th>
+                <th class="py-3 px-4">Elemento</th>
+                <th class="py-3 px-4">Solicitante</th>
+                <th class="py-3 px-4">Apertura</th>
+                <th class="py-3 px-4">Cierre / Estado</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-hist-consulta-body" class="divide-y divide-slate-200"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SUB-VISTA AUDITORÍA -->
+      <div id="subvista-hist-auditoria" class="hidden bg-white border border-slate-200 rounded-xl p-6">
+        <h2 class="text-base font-bold text-slate-900 mb-4">Bitácora de Auditoría Inmutable (Pestaña Auditoria)</h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr class="border-b border-slate-200 bg-slate-50 text-xs text-slate-600">
+                <th class="py-2.5 px-3">Fecha / Hora</th>
+                <th class="py-2.5 px-3">Usuario</th>
+                <th class="py-2.5 px-3">Módulo</th>
+                <th class="py-2.5 px-3">Acción</th>
+                <th class="py-2.5 px-3">Detalle</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-auditoria-body" class="divide-y divide-slate-200"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL NUEVA NOVEDAD -->
+  <div id="modal-novedad" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl border border-slate-200 max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+      <h3 class="text-base font-bold text-slate-900">Registrar novedad (Préstamo, Orden de salida o Pérdida)</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1">Elemento *</label>
+          <select id="nov-elemento" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"></select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1">Tipo de novedad *</label>
+          <select id="nov-tipo" onchange="toggleCamposOrdenSalida()" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            <option value="prestamo">Préstamo</option>
+            <option value="orden_salida">Orden de salida</option>
+            <option value="perdida">Pérdida</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid grid-cols-3 gap-3">
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1">Cantidad *</label>
+          <input id="nov-cantidad" type="number" value="1" min="1" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono" />
+        </div>
+        <div class="col-span-2">
+          <label class="block text-xs font-medium text-slate-700 mb-1">Nombre del solicitante *</label>
+          <input id="nov-solicitante" type="text" placeholder="Ej. Prof. Carlos Vargas" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1">Documento / Identificación *</label>
+          <input id="nov-documento" type="text" placeholder="Cédula o código" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1">Vínculo institucional *</label>
+          <select id="nov-vinculo" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            <option value="Docente">Docente</option>
+            <option value="Estudiante">Estudiante</option>
+            <option value="Administrativo">Administrativo</option>
+            <option value="Externo autorizado">Externo autorizado</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-700 mb-1">Dependencia / Programa académico *</label>
+        <input id="nov-dependencia" type="text" placeholder="Ej. Facultad de Ingeniería" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+      </div>
+      <div id="bloque-orden-salida" class="hidden space-y-3 p-3 rounded-lg bg-slate-50 border border-slate-200">
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1">Evento o actividad institucional *</label>
+          <input id="nov-evento" type="text" placeholder="Ej. Simposio Regional Sede Centro" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1">Referencia de autorización externa (Oficio / Memorando)</label>
+          <input id="nov-referencia" type="text" placeholder="Ej. Oficio Decanatura #214-2026" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" />
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-700 mb-1">Observaciones</label>
+        <input id="nov-obs" type="text" placeholder="Accesorios incluidos, salón o condición..." class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+      </div>
+      <div class="flex justify-end gap-2 pt-3 border-t border-slate-200">
+        <button onclick="cerrarModalNovedad()" class="px-4 py-2 text-xs font-medium border border-slate-300 rounded-lg">Cancelar</button>
+        <button onclick="guardarNovedadSheets()" class="px-4 py-2 text-xs font-semibold text-white bg-blue-900 rounded-lg">Guardar novedad</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CERRAR / RECIBIR NOVEDAD -->
+  <div id="modal-cerrar-novedad" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl border border-slate-200 max-w-md w-full p-6 space-y-4">
+      <h3 class="text-base font-bold text-slate-900">Registrar devolución / Cerrar novedad</h3>
+      <p id="lbl-cerrar-nov-info" class="text-xs text-slate-600 font-mono"></p>
+      <input type="hidden" id="cerrar-nov-id" />
+      <div>
+        <label class="block text-xs font-medium text-slate-700 mb-1">Nota de verificación / Estado en que se recibe *</label>
+        <textarea id="cerrar-nov-nota" rows="3" placeholder="Ej. Devuelto completo con cargador y cables en buen estado." class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"></textarea>
+      </div>
+      <div class="flex justify-end gap-2 pt-3 border-t border-slate-200">
+        <button onclick="ocultarModalCerrarNovedad()" class="px-4 py-2 text-xs font-medium border border-slate-300 rounded-lg">Cancelar</button>
+        <button onclick="confirmarCerrarNovedadSheets()" class="px-4 py-2 text-xs font-semibold text-white bg-emerald-700 rounded-lg hover:bg-emerald-800">Confirmar devolución</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL NUEVO / EDITAR ELEMENTO CATÁLOGO -->
+  <div id="modal-elemento" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl border border-slate-200 max-w-md w-full p-6 space-y-4">
+      <h3 id="titulo-modal-elemento" class="text-base font-bold text-slate-900">Guardar elemento en el catálogo</h3>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1">Código *</label>
+          <input id="cat-codigo" type="text" placeholder="AV-POR-004" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono uppercase" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1">Categoría</label>
+          <select id="cat-categoria" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            <option value="audiovisual">Audiovisual (Individual)</option>
+            <option value="deportivo">Deportivo (Por cantidad)</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-700 mb-1">Nombre del elemento *</label>
+        <input id="cat-nombre" type="text" placeholder="Ej. Portátil HP ProBook 440" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+      </div>
+      <div class="grid grid-cols-3 gap-3">
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1">Tipo</label>
+          <input id="cat-tipo" type="text" value="Portátil" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1">Cantidad</label>
+          <input id="cat-cantidad" type="number" value="1" min="1" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1">Ubicación</label>
+          <input id="cat-ubicacion" type="text" value="Estante A1" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3 items-center">
+        <div>
+          <label class="block text-xs font-medium text-slate-700 mb-1">Estado físico</label>
+          <select id="cat-estado-fisico" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            <option value="Óptimo">Óptimo</option>
+            <option value="Buen estado">Buen estado</option>
+            <option value="Desgaste leve">Desgaste leve</option>
+            <option value="En revisión">En revisión</option>
+          </select>
+        </div>
+        <label class="inline-flex items-center gap-2 text-xs text-slate-700 mt-5 cursor-pointer">
+          <input id="cat-activo" type="checkbox" checked class="rounded border-slate-300 text-blue-900" />
+          <span>Elemento activo</span>
+        </label>
+      </div>
+      <div class="flex justify-end gap-2 pt-3 border-t border-slate-200">
+        <button onclick="cerrarModalElemento()" class="px-4 py-2 text-xs font-medium border border-slate-300 rounded-lg">Cancelar</button>
+        <button onclick="guardarElementoSheets()" class="px-4 py-2 text-xs font-semibold text-white bg-blue-900 rounded-lg">Guardar en Catálogo</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const ELEMENTOS_SEMILLA = [
+      { codigo: 'AV-POR-001', nombre: 'Portátil Lenovo ThinkPad E14 Gen 5', categoria: 'audiovisual', tipo: 'Portátil', estadoFisico: 'Óptimo', activo: true, cantidadTotal: 1, ubicacion: 'Estante A1' },
+      { codigo: 'AV-POR-002', nombre: 'Portátil Lenovo ThinkPad E14 Gen 5', categoria: 'audiovisual', tipo: 'Portátil', estadoFisico: 'Óptimo', activo: true, cantidadTotal: 1, ubicacion: 'Estante A1' },
+      { codigo: 'AV-POR-003', nombre: 'Portátil Dell Latitude 5440', categoria: 'audiovisual', tipo: 'Portátil', estadoFisico: 'Buen estado', activo: true, cantidadTotal: 1, ubicacion: 'Estante A2' },
+      { codigo: 'AV-PRY-001', nombre: 'VideoBeam Epson PowerLite E20', categoria: 'audiovisual', tipo: 'Proyector', estadoFisico: 'Óptimo', activo: true, cantidadTotal: 1, ubicacion: 'Estante B1' },
+      { codigo: 'AV-PRY-002', nombre: 'VideoBeam Epson PowerLite W49', categoria: 'audiovisual', tipo: 'Proyector', estadoFisico: 'Buen estado', activo: true, cantidadTotal: 1, ubicacion: 'Estante B1' },
+      { codigo: 'AV-PAR-001', nombre: 'Cabina Activa JBL EON710 con Trípode', categoria: 'audiovisual', tipo: 'Parlante', estadoFisico: 'Óptimo', activo: true, cantidadTotal: 1, ubicacion: 'Zona Audio C1' },
+      { codigo: 'AV-MIC-001', nombre: 'Micrófono Inalámbrico Shure BLX24', categoria: 'audiovisual', tipo: 'Micrófono', estadoFisico: 'Óptimo', activo: true, cantidadTotal: 1, ubicacion: 'Gaveta C2' },
+      { codigo: 'AV-PRE-001', nombre: 'Presentador de Diapositivas Logitech R400', categoria: 'audiovisual', tipo: 'Presentador', estadoFisico: 'Desgaste leve', activo: true, cantidadTotal: 1, ubicacion: 'Gaveta D1' },
+      { codigo: 'AV-PRE-002', nombre: 'Presentador Inalámbrico Logitech Spotlight', categoria: 'audiovisual', tipo: 'Presentador', estadoFisico: 'Óptimo', activo: true, cantidadTotal: 1, ubicacion: 'Gaveta D1' },
+      { codigo: 'AV-CTL-001', nombre: 'Control Remoto Epson Aulas Bloque B', categoria: 'audiovisual', tipo: 'Control', estadoFisico: 'Buen estado', activo: true, cantidadTotal: 1, ubicacion: 'Tablero Llaves E1' },
+      { codigo: 'DEP-FUT-01', nombre: 'Balones de Fútbol Golty Profesional #5', categoria: 'deportivo', tipo: 'Balón', estadoFisico: 'Buen estado', activo: true, cantidadTotal: 10, ubicacion: 'Rack Deportivo R1' },
+      { codigo: 'DEP-VOL-01', nombre: 'Balones de Voleibol Mikasa V200W', categoria: 'deportivo', tipo: 'Balón', estadoFisico: 'Óptimo', activo: true, cantidadTotal: 8, ubicacion: 'Rack Deportivo R2' },
+      { codigo: 'DEP-BAL-01', nombre: 'Balones de Baloncesto Spalding TF-500', categoria: 'deportivo', tipo: 'Balón', estadoFisico: 'Buen estado', activo: true, cantidadTotal: 8, ubicacion: 'Rack Deportivo R3' },
+      { codigo: 'DEP-MES-01', nombre: 'Kits de Tenis de Mesa (2 raquetas + 3 bolas)', categoria: 'deportivo', tipo: 'Implemento', estadoFisico: 'Buen estado', activo: true, cantidadTotal: 12, ubicacion: 'Cajón Deportivo D2' },
+      { codigo: 'DEP-AJE-01', nombre: 'Juegos de Ajedrez Reglamentarios con Estuche', categoria: 'deportivo', tipo: 'Implemento', estadoFisico: 'Óptimo', activo: true, cantidadTotal: 6, ubicacion: 'Estante Deportivo D3' }
+    ];
+
+    let estadoGlobal = {
+      elementos: ELEMENTOS_SEMILLA,
+      novedades: [],
+      cierres: [],
+      aperturas: [],
+      auditoria: [],
+      decisionAudiovisual: {},
+      conteoDeportivo: {},
+      chequeoApertura: {},
+      cierreHoyFirmado: null,
+      filtroCierre: 'todos',       // 'todos' | 'pendientes' | 'excepciones' | 'audiovisuales' | 'deportivos'
+      filtroNovEstado: 'abiertas', // 'abiertas' | 'cerradas' | 'todas'
+      filtroNovTipo: 'todos',      // 'todos' | 'prestamo' | 'orden_salida' | 'perdida'
+      filtroCat: 'todos',          // 'todos' | 'audiovisual' | 'deportivo'
+      subHistorial: 'cierres',     // 'cierres' | 'consulta' | 'auditoria'
+      umbralEscalamientoDias: 3
+    };
+
+    const hoyISO = new Date().toISOString().slice(0, 10);
+    document.getElementById('fecha-cierre-label').textContent = 'Fecha ' + hoyISO;
+    document.getElementById('top-fecha').textContent = hoyISO;
+
+    function calcularDias(fechaEv) {
+      if (!fechaEv) return 0;
+      const d1 = new Date(fechaEv + 'T00:00:00');
+      const d2 = new Date(hoyISO + 'T00:00:00');
+      return Math.max(0, Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24)));
+    }
+
+    function etiquetaTipo(t) {
+      if (t === 'perdida') return 'Pérdida';
+      if (t === 'orden_salida') return 'Orden de salida';
+      return 'Préstamo';
+    }
+
+    function mostrarAviso(texto, tipo) {
+      const box = document.getElementById('alerta-sistema');
+      box.className = 'rounded-lg border px-4 py-3 text-xs font-medium flex items-center justify-between no-print ' +
+        (tipo === 'error' ? 'bg-red-50 border-red-200 text-red-900' : 'bg-emerald-50 border-emerald-200 text-emerald-900');
+      box.innerHTML = '<span>' + texto + '</span><button onclick="this.parentElement.classList.add(\'hidden\')" class="ml-4 font-bold">✕</button>';
+      box.classList.remove('hidden');
+    }
+
+    function cargarDatosDesdeSheets() {
+      renderizarTodo();
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler(function(res) {
+            const badge = document.getElementById('badge-conexion');
+            badge.textContent = 'Sincronizado con Sheets';
+            hidratarInterfaz(res);
+          })
+          .withFailureHandler(function(err) {
+            mostrarAviso('Error al leer Google Sheets: ' + err.message, 'error');
+          })
+          .obtenerEstadoCompleto();
+      } else {
+        document.getElementById('badge-conexion').textContent = 'Vista local';
+        document.getElementById('usuario-activo').textContent = 'Cuenta activa: modo local';
+      }
+    }
+
+    function hidratarInterfaz(res) {
+      if (!res) return;
+      if (res.elementos && res.elementos.length > 0) estadoGlobal.elementos = res.elementos;
+      estadoGlobal.novedades = res.novedades || [];
+      estadoGlobal.cierres = res.cierres || [];
+      estadoGlobal.aperturas = res.aperturas || [];
+      estadoGlobal.auditoria = res.auditoria || [];
+      document.getElementById('usuario-activo').textContent = 'Cuenta activa: ' + (res.usuario ? res.usuario.email : 'institucional');
+
+      const firmadoHoy = estadoGlobal.cierres.find(function(c) { return c.fecha === hoyISO; });
+      estadoGlobal.cierreHoyFirmado = firmadoHoy || null;
+      renderizarTodo();
+    }
+
+    function obtenerAbiertasPorCodigo() {
+      const mapa = {};
+      estadoGlobal.novedades.filter(function(n) { return n.estado === 'abierta'; }).forEach(function(n) {
+        if (!mapa[n.elementoCodigo]) mapa[n.elementoCodigo] = [];
+        mapa[n.elementoCodigo].push(n);
+      });
+      return mapa;
+    }
+
+    // Cambios de filtros
+    function cambiarFiltroCierre(f) {
+      estadoGlobal.filtroCierre = f;
+      ['todos', 'pendientes', 'excepciones', 'audiovisuales', 'deportivos'].forEach(function(id) {
+        document.getElementById('fc-' + id).className = id === f
+          ? 'px-3 py-1.5 text-xs font-medium rounded-md bg-white text-slate-900 shadow-xs'
+          : 'px-3 py-1.5 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900';
+      });
+      renderizarTodo();
+    }
+
+    function cambiarFiltroNovEstado(e) {
+      estadoGlobal.filtroNovEstado = e;
+      ['abiertas', 'cerradas', 'todas'].forEach(function(id) {
+        document.getElementById('fne-' + id).className = id === e
+          ? 'px-3 py-1.5 text-xs font-medium rounded-md bg-white text-slate-900 shadow-xs'
+          : 'px-3 py-1.5 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900';
+      });
+      renderizarTodo();
+    }
+
+    function cambiarFiltroNovTipo(t) {
+      estadoGlobal.filtroNovTipo = t;
+      ['todos', 'prestamo', 'orden_salida', 'perdida'].forEach(function(id) {
+        document.getElementById('fnt-' + id).className = id === t
+          ? 'px-3 py-1.5 text-xs font-medium rounded-md bg-white text-slate-900 shadow-xs'
+          : 'px-3 py-1.5 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900';
+      });
+      renderizarTodo();
+    }
+
+    function cambiarFiltroCat(c) {
+      estadoGlobal.filtroCat = c;
+      ['todos', 'audiovisual', 'deportivo'].forEach(function(id) {
+        document.getElementById('fcat-' + id).className = id === c
+          ? 'px-3 py-1.5 text-xs font-medium rounded-md bg-white text-slate-900 shadow-xs'
+          : 'px-3 py-1.5 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900';
+      });
+      renderizarTodo();
+    }
+
+    function cambiarSubHistorial(s) {
+      estadoGlobal.subHistorial = s;
+      ['cierres', 'consulta', 'auditoria'].forEach(function(id) {
+        document.getElementById('sh-' + id).className = id === s
+          ? 'px-3.5 py-1.5 text-xs font-medium rounded-md bg-white text-slate-900 shadow-xs'
+          : 'px-3.5 py-1.5 text-xs font-medium rounded-md text-slate-600 hover:text-slate-900';
+        document.getElementById('subvista-hist-' + id).classList.toggle('hidden', id !== s);
+      });
+    }
+
+    function cambiarUmbralDias(val) {
+      estadoGlobal.umbralEscalamientoDias = Math.max(1, Number(val) || 3);
+      document.getElementById('lbl-umbral-nov').textContent = String(estadoGlobal.umbralEscalamientoDias);
+      renderizarTodo();
+    }
+
+    function marcarAudiovisual(codigo, resultado) {
+      if (estadoGlobal.cierreHoyFirmado) return;
+      estadoGlobal.decisionAudiovisual[codigo] = resultado;
+      renderizarTodo();
+    }
+
+    function ajustarDeportivo(codigo, delta, valorDirecto) {
+      if (estadoGlobal.cierreHoyFirmado) return;
+      const el = estadoGlobal.elementos.find(function(e) { return e.codigo === codigo; });
+      if (!el) return;
+      const actual = estadoGlobal.conteoDeportivo[codigo] ? estadoGlobal.conteoDeportivo[codigo].enOficina : el.cantidadTotal;
+      const nuevo = valorDirecto !== undefined ? Number(valorDirecto) : (actual + delta);
+      const ajustado = Math.max(0, Math.min(el.cantidadTotal, nuevo));
+      estadoGlobal.conteoDeportivo[codigo] = { enOficina: ajustado, verificado: true };
+      renderizarTodo();
+    }
+
+    function marcarPendientesEnOficina() {
+      if (estadoGlobal.cierreHoyFirmado) return;
+      const abiertasPorCodigo = obtenerAbiertasPorCodigo();
+      estadoGlobal.elementos.forEach(function(el) {
+        if (!el.activo) return;
+        const abiertas = abiertasPorCodigo[el.codigo] || [];
+        const justificadas = abiertas.reduce(function(s, n) { return s + Number(n.cantidad || 1); }, 0);
+        if (el.categoria !== 'deportivo') {
+          if (abiertas.length === 0) estadoGlobal.decisionAudiovisual[el.codigo] = 'en_oficina';
+        } else {
+          estadoGlobal.conteoDeportivo[el.codigo] = {
+            enOficina: Math.max(0, el.cantidadTotal - justificadas),
+            verificado: true
+          };
+        }
+      });
+      mostrarAviso('Se marcaron como En oficina todos los elementos sin novedad abierta pendiente.', 'exito');
+      renderizarTodo();
+    }
+
+    function renderizarTodo() {
+      const abiertasPorCodigo = obtenerAbiertasPorCodigo();
+      const elementosActivos = estadoGlobal.elementos.filter(function(e) { return e.activo !== false; });
+      const todasAbiertas = estadoGlobal.novedades.filter(function(n) { return n.estado === 'abierta'; });
+      document.getElementById('top-count-abiertas').textContent = String(todasAbiertas.length);
+      document.getElementById('top-estado-cierre').textContent = estadoGlobal.cierreHoyFirmado ? 'Firmado' : 'En curso';
+
+      // 1. Evaluar estado de cada elemento en Cierre Diario
+      let verificados = 0;
+      let conNovedad = 0;
+      let sinJustificar = 0;
+      const problemas = [];
+      const mapaProblemaPorCodigo = {};
+
+      elementosActivos.forEach(function(el) {
+        const abiertas = abiertasPorCodigo[el.codigo] || [];
+        const justificadas = abiertas.reduce(function(s, n) { return s + Number(n.cantidad || 1); }, 0);
+        if (abiertas.length > 0) conNovedad++;
+
+        if (el.categoria !== 'deportivo') {
+          if (!estadoGlobal.decisionAudiovisual[el.codigo] || (abiertas.length > 0 && estadoGlobal.decisionAudiovisual[el.codigo] === 'pendiente')) {
+            estadoGlobal.decisionAudiovisual[el.codigo] = abiertas.length > 0 ? 'no_esta' : 'pendiente';
+          }
+          const res = estadoGlobal.decisionAudiovisual[el.codigo];
+          if (res === 'pendiente') {
+            const msg = el.codigo + ' (' + el.nombre + '): Falta marcar si está En oficina o No está.';
+            problemas.push(msg);
+            mapaProblemaPorCodigo[el.codigo] = 'sin_resultado';
+          } else if (res === 'no_esta' && abiertas.length === 0) {
+            sinJustificar++;
+            problemas.push(el.codigo + ' (' + el.nombre + '): Marcado como No está sin novedad abierta que lo justifique.');
+            mapaProblemaPorCodigo[el.codigo] = 'ausencia_sin_novedad';
+          } else if (res === 'en_oficina' && abiertas.length > 0) {
+            sinJustificar++;
+            problemas.push(el.codigo + ' (' + el.nombre + '): Marcado En oficina, pero aún figura con una novedad abierta.');
+            mapaProblemaPorCodigo[el.codigo] = 'exceso_en_oficina';
+          } else {
+            verificados++;
+          }
+        } else {
+          if (!estadoGlobal.conteoDeportivo[el.codigo]) {
+            estadoGlobal.conteoDeportivo[el.codigo] = {
+              enOficina: Math.max(0, el.cantidadTotal - justificadas),
+              verificado: justificadas > 0
+            };
+          }
+          const info = estadoGlobal.conteoDeportivo[el.codigo];
+          const faltantes = el.cantidadTotal - info.enOficina;
+          if (!info.verificado) {
+            problemas.push(el.codigo + ' (' + el.nombre + '): Falta confirmar el conteo de unidades en oficina.');
+            mapaProblemaPorCodigo[el.codigo] = 'sin_resultado';
+          } else if (faltantes > justificadas) {
+            const dif = faltantes - justificadas;
+            sinJustificar++;
+            problemas.push(el.codigo + ' (' + el.nombre + '): Faltan ' + dif + ' unidad(es) en oficina sin novedad registrada.');
+            mapaProblemaPorCodigo[el.codigo] = 'ausencia_sin_novedad';
+          } else if (faltantes < justificadas) {
+            sinJustificar++;
+            problemas.push(el.codigo + ' (' + el.nombre + '): Cierre primero la devolución.');
+            mapaProblemaPorCodigo[el.codigo] = 'exceso_en_oficina';
+          } else {
+            verificados++;
+          }
+        }
+      });
+
+      // Actualizar contadores de pestañas de Cierre Diario
+      document.getElementById('fc-todos').textContent = 'Todos (' + elementosActivos.length + ')';
+      document.getElementById('fc-pendientes').textContent = 'Por resolver (' + problemas.length + ')';
+
+      const qCierre = (document.getElementById('busqueda-cierre').value || '').trim().toLowerCase();
+      const fc = estadoGlobal.filtroCierre;
+
+      const filtradosCierre = elementosActivos.filter(function(el) {
+        if (qCierre) {
+          const txt = (el.codigo + ' ' + el.nombre + ' ' + el.tipo + ' ' + el.ubicacion).toLowerCase();
+          if (txt.indexOf(qCierre) === -1) return false;
+        }
+        const prob = mapaProblemaPorCodigo[el.codigo];
+        const abiertas = abiertasPorCodigo[el.codigo] || [];
+        if (fc === 'audiovisuales') return el.categoria !== 'deportivo';
+        if (fc === 'deportivos') return el.categoria === 'deportivo';
+        if (fc === 'pendientes') return Boolean(prob);
+        if (fc === 'excepciones') return abiertas.length > 0 || Boolean(prob) || estadoGlobal.decisionAudiovisual[el.codigo] === 'no_esta';
+        return true;
+      });
+
+      const avFiltrados = filtradosCierre.filter(function(e) { return e.categoria !== 'deportivo'; });
+      const depFiltrados = filtradosCierre.filter(function(e) { return e.categoria === 'deportivo'; });
+
+      document.getElementById('bloque-tabla-audiovisuales').classList.toggle('hidden', fc === 'deportivos');
+      document.getElementById('bloque-tabla-deportivos').classList.toggle('hidden', fc === 'audiovisuales');
+      document.getElementById('contador-filas-av').textContent = 'Mostrando ' + avFiltrados.length + ' equipo(s)';
+      document.getElementById('contador-filas-dep').textContent = 'Mostrando ' + depFiltrados.length + ' grupo(s)';
+
+      // Render tabla Audiovisuales
+      document.getElementById('tabla-audiovisuales-body').innerHTML = avFiltrados.length === 0
+        ? '<tr><td colspan="5" class="p-8 text-center text-slate-500">No hay equipos audiovisuales que coincidan con el filtro seleccionado.</td></tr>'
+        : avFiltrados.map(function(el) {
+            const abiertas = abiertasPorCodigo[el.codigo] || [];
+            const res = estadoGlobal.decisionAudiovisual[el.codigo];
+            const prob = mapaProblemaPorCodigo[el.codigo];
+
+            let estadoVal = '';
+            if (prob === 'sin_resultado') {
+              estadoVal = '<span class="text-xs text-slate-500">Pendiente marcar</span>';
+            } else if (prob === 'ausencia_sin_novedad') {
+              estadoVal = '<button onclick="abrirModalNovedad(\'' + el.codigo + '\', 1)" class="px-2.5 py-1 text-xs font-medium text-white bg-red-700 rounded-md hover:bg-red-800">Justificar ausencia</button>';
+            } else if (prob === 'exceso_en_oficina' && abiertas[0]) {
+              estadoVal = '<button onclick="abrirModalCerrarNovedad(\'' + abiertas[0].id + '\')" class="px-2.5 py-1 text-xs font-medium text-white bg-emerald-700 rounded-md hover:bg-emerald-800">Cerrar devolución</button>';
+            } else if (abiertas[0]) {
+              estadoVal = '<span class="text-xs text-emerald-700 font-medium mr-2">✓ Justificado</span><button onclick="abrirModalCerrarNovedad(\'' + abiertas[0].id + '\')" class="text-xs font-medium text-blue-800 hover:underline">Recibir hoy</button>';
+            } else {
+              estadoVal = '<span class="text-xs text-emerald-700 font-medium">✓ Conforme</span>';
+            }
+
+            const textoNov = abiertas[0]
+              ? '<div class="text-xs font-medium text-amber-800">' + etiquetaTipo(abiertas[0].tipo) + ' · ' + abiertas[0].solicitanteNombre + '</div><div class="text-xs text-slate-500 font-mono">' + abiertas[0].id + ' · ' + abiertas[0].fechaEvento + '</div>'
+              : '<span class="text-xs text-slate-400">Sin novedad abierta</span>';
+
+            return '<tr class="hover:bg-slate-50/70">' +
+              '<td class="py-3 px-4 font-mono text-xs font-semibold text-slate-900">' + el.codigo + '</td>' +
+              '<td class="py-3 px-4"><div class="font-medium text-slate-900">' + el.nombre + '</div><div class="text-xs text-slate-500">' + el.tipo + ' · ' + el.ubicacion + ' · Estado: ' + el.estadoFisico + '</div></td>' +
+              '<td class="py-3 px-4">' + textoNov + '</td>' +
+              '<td class="py-3 px-4">' +
+                '<div class="inline-flex items-center gap-1 p-1 bg-slate-100 rounded-lg">' +
+                  '<button onclick="marcarAudiovisual(\'' + el.codigo + '\', \'en_oficina\')" class="px-2.5 py-1 text-xs font-medium rounded-md ' + (res === 'en_oficina' ? 'bg-emerald-700 text-white' : 'text-slate-600') + '">En oficina</button>' +
+                  '<button onclick="marcarAudiovisual(\'' + el.codigo + '\', \'no_esta\')" class="px-2.5 py-1 text-xs font-medium rounded-md ' + (res === 'no_esta' ? 'bg-amber-700 text-white' : 'text-slate-600') + '">No está</button>' +
+                '</div>' +
+              '</td>' +
+              '<td class="py-3 px-4 text-right no-print">' + estadoVal + '</td>' +
+            '</tr>';
+          }).join('');
+
+      // Render tabla Deportivos
+      document.getElementById('tabla-deportivos-body').innerHTML = depFiltrados.length === 0
+        ? '<tr><td colspan="6" class="p-8 text-center text-slate-500">No hay elementos deportivos que coincidan con el filtro seleccionado.</td></tr>'
+        : depFiltrados.map(function(el) {
+            const abiertas = abiertasPorCodigo[el.codigo] || [];
+            const justificadas = abiertas.reduce(function(s, n) { return s + Number(n.cantidad || 1); }, 0);
+            const info = estadoGlobal.conteoDeportivo[el.codigo];
+            const faltantes = el.cantidadTotal - info.enOficina;
+            const prob = mapaProblemaPorCodigo[el.codigo];
+
+            let accionHtml = '';
+            if (prob === 'sin_resultado') {
+              accionHtml = '<button onclick="ajustarDeportivo(\'' + el.codigo + '\', 0, ' + info.enOficina + ')" class="px-2.5 py-1 text-xs font-medium text-blue-900 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100">Confirmar ' + info.enOficina + ' en sala</button>';
+            } else if (prob === 'ausencia_sin_novedad') {
+              const dif = faltantes - justificadas;
+              accionHtml = '<button onclick="abrirModalNovedad(\'' + el.codigo + '\', ' + dif + ')" class="px-2.5 py-1 text-xs font-medium text-white bg-red-700 rounded-md hover:bg-red-800">Justificar ' + dif + ' faltante(s)</button>';
+            } else if (prob === 'exceso_en_oficina') {
+              accionHtml = '<span class="text-xs text-red-700 font-medium">Cierre devolución primero</span>';
+            } else {
+              accionHtml = '<span class="text-xs text-emerald-700 font-medium">✓ Cuadre verificado</span>';
+            }
+
+            const novHtml = abiertas.length > 0
+              ? abiertas.map(function(n) {
+                  return '<div class="text-xs text-amber-800">' + n.cantidad + 'x ' + etiquetaTipo(n.tipo) + ' · ' + n.solicitanteNombre + ' <button onclick="abrirModalCerrarNovedad(\'' + n.id + '\')" class="text-blue-800 underline ml-1">Recibir</button></div>';
+                }).join('')
+              : '<span class="text-xs text-slate-400">0 unidades con novedad</span>';
+
+            return '<tr class="hover:bg-slate-50/70">' +
+              '<td class="py-3 px-4 font-mono text-xs font-semibold text-slate-900">' + el.codigo + '</td>' +
+              '<td class="py-3 px-4"><div class="font-medium text-slate-900">' + el.nombre + '</div><div class="text-xs text-slate-500">' + el.tipo + ' · ' + el.ubicacion + ' · Estado: ' + el.estadoFisico + '</div></td>' +
+              '<td class="py-3 px-4 text-right font-mono font-semibold">' + el.cantidadTotal + '</td>' +
+              '<td class="py-3 px-4">' + novHtml + '</td>' +
+              '<td class="py-3 px-4 text-right">' +
+                '<div class="inline-flex items-center justify-end gap-1.5">' +
+                  '<button onclick="ajustarDeportivo(\'' + el.codigo + '\', -1)" class="p-1.5 rounded-md border border-slate-300 bg-white text-xs font-bold">-</button>' +
+                  '<input type="number" min="0" max="' + el.cantidadTotal + '" value="' + info.enOficina + '" onchange="ajustarDeportivo(\'' + el.codigo + '\', 0, this.value)" class="w-16 text-center rounded-md border border-slate-300 py-1 px-2 text-sm font-mono font-semibold" />' +
+                  '<button onclick="ajustarDeportivo(\'' + el.codigo + '\', 1)" class="p-1.5 rounded-md border border-slate-300 bg-white text-xs font-bold">+</button>' +
+                '</div>' +
+              '</td>' +
+              '<td class="py-3 px-4 text-right no-print">' + accionHtml + '</td>' +
+            '</tr>';
+          }).join('');
+
+      // Actualizar KPIs de Cierre Diario
+      const totalCodigos = elementosActivos.length;
+      document.getElementById('kpi-progreso').textContent = verificados + ' / ' + totalCodigos;
+      document.getElementById('kpi-progreso-sub').textContent = (totalCodigos - verificados) === 0 ? 'Todos los códigos revisados' : (totalCodigos - verificados) + ' pendiente(s) por resolver';
+      document.getElementById('kpi-novedades').textContent = String(conNovedad);
+      document.getElementById('kpi-sin-justificar').textContent = String(sinJustificar);
+      document.getElementById('kpi-sin-justificar').className = 'text-2xl font-bold font-mono mt-1 ' + (sinJustificar > 0 ? 'text-red-700' : 'text-emerald-700');
+
+      const cajaReq = document.getElementById('caja-requisitos-pendientes');
+      const btnFirmar = document.getElementById('btn-firmar');
+      const chkDec = document.getElementById('chk-declaracion').checked;
+
+      if (estadoGlobal.cierreHoyFirmado) {
+        cajaReq.classList.add('hidden');
+        btnFirmar.textContent = '✓ Cierre Firmado (' + estadoGlobal.cierreHoyFirmado.selloConfirmacion + ')';
+        btnFirmar.disabled = true;
+        document.getElementById('kpi-estado-firma').textContent = estadoGlobal.cierreHoyFirmado.responsableCorreo || 'Firmado';
+        document.getElementById('kpi-sello-firma').textContent = estadoGlobal.cierreHoyFirmado.selloConfirmacion;
+        document.getElementById('badge-estado-cierre').textContent = 'Cierre firmado y bloqueado';
+        document.getElementById('badge-estado-cierre').className = 'font-medium text-emerald-700';
+      } else if (problemas.length > 0) {
+        cajaReq.classList.remove('hidden');
+        cajaReq.innerHTML = '<div class="font-semibold mb-1">Firma bloqueada: quedan ' + problemas.length + ' requisito(s) por resolver antes de cerrar el día:</div>' +
+          '<ul class="list-disc pl-5 space-y-0.5">' + problemas.slice(0, 5).map(function(p) { return '<li>' + p + '</li>'; }).join('') + '</ul>';
+        btnFirmar.disabled = true;
+        document.getElementById('kpi-estado-firma').textContent = 'Pendiente de completar';
+      } else {
+        cajaReq.classList.add('hidden');
+        btnFirmar.disabled = !chkDec;
+        document.getElementById('kpi-estado-firma').textContent = 'Listo para confirmar';
+      }
+
+      // 2. Renderizar Vista NOVEDADES con sus filtros y buscador
+      const prestamosAb = todasAbiertas.filter(function(n) { return n.tipo === 'prestamo'; }).length;
+      const salidasAb = todasAbiertas.filter(function(n) { return n.tipo === 'orden_salida'; }).length;
+      const perdidasAb = todasAbiertas.filter(function(n) { return n.tipo === 'perdida'; }).length;
+      const antiguasAb = todasAbiertas.filter(function(n) { return calcularDias(n.fechaEvento) >= estadoGlobal.umbralEscalamientoDias; }).length;
+
+      document.getElementById('nov-kpi-abiertas').textContent = String(todasAbiertas.length);
+      document.getElementById('nov-kpi-sub').textContent = prestamosAb + ' préstamos · ' + salidasAb + ' salidas';
+      document.getElementById('nov-kpi-perdidas').textContent = String(perdidasAb);
+      document.getElementById('nov-kpi-antiguas').textContent = String(antiguasAb);
+      document.getElementById('nov-kpi-salidas').textContent = String(salidasAb);
+
+      const qNov = (document.getElementById('busqueda-novedades').value || '').trim().toLowerCase();
+      const novFiltradas = estadoGlobal.novedades.filter(function(n) {
+        if (estadoGlobal.filtroNovEstado === 'abiertas' && n.estado !== 'abierta') return false;
+        if (estadoGlobal.filtroNovEstado === 'cerradas' && n.estado !== 'cerrada') return false;
+        if (estadoGlobal.filtroNovTipo !== 'todos' && n.tipo !== estadoGlobal.filtroNovTipo) return false;
+        if (qNov) {
+          const txt = (n.id + ' ' + n.elementoCodigo + ' ' + n.solicitanteNombre + ' ' + n.solicitanteDependencia + ' ' + (n.eventoOrdenSalida || '')).toLowerCase();
+          if (txt.indexOf(qNov) === -1) return false;
+        }
+        return true;
+      });
+
+      document.getElementById('tabla-novedades-body').innerHTML = novFiltradas.length === 0
+        ? '<tr><td colspan="6" class="p-10 text-center text-slate-500">No se encontraron novedades para los criterios seleccionados.</td></tr>'
+        : novFiltradas.map(function(n) {
+            const el = estadoGlobal.elementos.find(function(e) { return e.codigo === n.elementoCodigo; });
+            const dias = calcularDias(n.fechaEvento);
+            const btn = n.estado === 'abierta'
+              ? '<button onclick="abrirModalCerrarNovedad(\'' + n.id + '\')" class="px-3 py-1.5 text-xs font-medium text-white bg-emerald-700 rounded-lg hover:bg-emerald-800">Cerrar / Recibir</button>'
+              : '<span class="text-xs font-medium text-emerald-700">✓ Cerrada</span>';
+
+            return '<tr class="hover:bg-slate-50/70 align-top">' +
+              '<td class="py-3.5 px-4 font-mono text-xs"><div class="font-semibold text-slate-900">' + n.id + '</div><div class="text-slate-500">' + n.fechaEvento + ' · ' + n.horaEvento + '</div>' + (n.estado === 'abierta' ? '<div class="text-slate-500 mt-0.5">' + (dias === 0 ? 'Abierta hoy' : dias + 'd abierta') + '</div>' : '') + '</td>' +
+              '<td class="py-3.5 px-4"><div class="font-medium text-slate-900"><span class="font-mono text-xs font-semibold">' + n.elementoCodigo + '</span> · ' + (el ? el.nombre : '') + '</div><div class="text-xs text-slate-500 font-mono">Cantidad: ' + n.cantidad + ' unidad(es)</div></td>' +
+              '<td class="py-3.5 px-4 max-w-xs"><div class="text-xs font-semibold">' + etiquetaTipo(n.tipo) + '</div>' + (n.eventoOrdenSalida ? '<div class="text-xs text-slate-700">Evento: ' + n.eventoOrdenSalida + '</div>' : '') + '<p class="text-xs text-slate-600 mt-1">' + (n.observaciones || '') + '</p>' + (n.notaResolucion ? '<p class="text-xs text-emerald-800 mt-1">Resolución: ' + n.notaResolucion + '</p>' : '') + '</td>' +
+              '<td class="py-3.5 px-4"><div class="font-medium text-slate-900">' + n.solicitanteNombre + '</div><div class="text-xs text-slate-500">' + n.solicitanteVinculo + ' · ' + n.solicitanteDependencia + '</div><div class="text-xs font-mono text-slate-400">Doc: ' + (n.solicitanteDocumento || '-') + '</div></td>' +
+              '<td class="py-3.5 px-4 text-xs text-slate-600"><div>Abrió: ' + (n.auxiliarRegistroCorreo || '-') + '</div>' + (n.auxiliarCierreCorreo ? '<div class="text-emerald-800 mt-1">Cerró: ' + n.auxiliarCierreCorreo + '</div>' : '') + '</td>' +
+              '<td class="py-3.5 px-4 text-right">' + btn + '</td>' +
+            '</tr>';
+          }).join('');
+
+      // 3. Renderizar Vista APERTURA
+      document.getElementById('tabla-apertura-body').innerHTML = elementosActivos.map(function(el) {
+        const abiertas = abiertasPorCodigo[el.codigo] || [];
+        const afuera = abiertas.reduce(function(s, n) { return s + Number(n.cantidad || 1); }, 0);
+        const esperado = Math.max(0, el.cantidadTotal - afuera);
+        const est = estadoGlobal.chequeoApertura[el.codigo] || 'conforme';
+
+        return '<tr class="hover:bg-slate-50/70">' +
+          '<td class="py-2.5 px-4 font-mono text-xs font-semibold">' + el.codigo + '</td>' +
+          '<td class="py-2.5 px-4 font-medium">' + el.nombre + '</td>' +
+          '<td class="py-2.5 px-4 text-xs text-slate-500">' + el.ubicacion + '</td>' +
+          '<td class="py-2.5 px-4 text-right font-mono text-xs font-semibold">' + (el.categoria !== 'deportivo' ? (esperado === 1 ? 'En oficina (1)' : 'Afuera con novedad (0)') : esperado + ' de ' + el.cantidadTotal + ' unid.') + '</td>' +
+          '<td class="py-2.5 px-4 text-right">' +
+            '<div class="inline-flex items-center gap-2">' +
+              '<div class="inline-flex items-center gap-1 p-1 bg-slate-100 rounded-lg">' +
+                '<button onclick="marcarChequeoApertura(\'' + el.codigo + '\', \'conforme\')" class="px-2.5 py-1 text-xs font-medium rounded-md ' + (est === 'conforme' ? 'bg-white text-emerald-800 shadow-xs' : 'text-slate-600') + '">Conforme</button>' +
+                '<button onclick="marcarChequeoApertura(\'' + el.codigo + '\', \'diferencia\')" class="px-2.5 py-1 text-xs font-medium rounded-md ' + (est === 'diferencia' ? 'bg-red-700 text-white' : 'text-slate-600') + '">Diferencia</button>' +
+              '</div>' +
+              (est === 'diferencia' ? '<button onclick="abrirModalNovedad(\'' + el.codigo + '\', 1)" class="px-2.5 py-1 text-xs font-medium text-red-800 bg-red-50 border border-red-200 rounded-md">+ Abrir novedad</button>' : '') +
+            '</div>' +
+          '</td>' +
+        '</tr>';
+      }).join('');
+
+      document.getElementById('lista-aperturas-body').innerHTML = estadoGlobal.aperturas.length === 0
+        ? '<div class="p-6 text-center text-xs text-slate-400">Sin verificaciones de apertura registradas aún.</div>'
+        : estadoGlobal.aperturas.map(function(ap) {
+            return '<div class="px-6 py-4 flex justify-between items-center text-sm">' +
+              '<div><div class="font-medium font-mono text-xs">' + ap.fecha + ' · ' + ap.hora + ' · ' + ap.auxiliarCorreo + '</div><p class="text-xs text-slate-600 mt-0.5">' + ap.observaciones + '</p></div>' +
+              '<span class="text-xs font-medium ' + (ap.conformeConCierreAnterior ? 'text-emerald-700' : 'text-amber-800') + '">' + (ap.conformeConCierreAnterior ? '✓ Conforme' : ap.diferenciasReportadas + ' diferencia(s)') + '</span>' +
+            '</div>';
+          }).join('');
+
+      // 4. Renderizar Vista CATÁLOGO con sus filtros y buscador
+      const avActivos = elementosActivos.filter(function(e) { return e.categoria !== 'deportivo'; });
+      const depActivos = elementosActivos.filter(function(e) { return e.categoria === 'deportivo'; });
+      const totalUnidDep = depActivos.reduce(function(s, e) { return s + Number(e.cantidadTotal || 1); }, 0);
+
+      document.getElementById('cat-kpi-activos').textContent = String(elementosActivos.length);
+      document.getElementById('cat-kpi-av').textContent = String(avActivos.length);
+      document.getElementById('cat-kpi-dep').textContent = String(depActivos.length);
+      document.getElementById('cat-kpi-unid').textContent = String(totalUnidDep);
+
+      const mostrarInactivos = document.getElementById('chk-mostrar-inactivos').checked;
+      const qCat = (document.getElementById('busqueda-catalogo').value || '').trim().toLowerCase();
+
+      const catFiltrados = estadoGlobal.elementos.filter(function(el) {
+        if (!mostrarInactivos && el.activo === false) return false;
+        if (estadoGlobal.filtroCat !== 'todos' && el.categoria !== estadoGlobal.filtroCat) return false;
+        if (qCat) {
+          const txt = (el.codigo + ' ' + el.nombre + ' ' + el.tipo + ' ' + el.ubicacion).toLowerCase();
+          if (txt.indexOf(qCat) === -1) return false;
+        }
+        return true;
+      });
+
+      document.getElementById('tabla-catalogo-body').innerHTML = catFiltrados.map(function(el) {
+        const abiertas = abiertasPorCodigo[el.codigo] || [];
+        const afuera = abiertas.reduce(function(s, n) { return s + Number(n.cantidad || 1); }, 0);
+        const disp = Math.max(0, el.cantidadTotal - afuera);
+        return '<tr class="hover:bg-slate-50/70">' +
+          '<td class="py-3 px-4 font-mono text-xs font-semibold">' + el.codigo + '</td>' +
+          '<td class="py-3 px-4"><div class="font-medium text-slate-900">' + el.nombre + '</div><div class="text-xs text-slate-500">' + el.tipo + ' · ' + el.ubicacion + '</div></td>' +
+          '<td class="py-3 px-4 text-xs text-slate-600">' + (el.categoria === 'deportivo' ? 'Deportivo (Cantidad)' : 'Audiovisual (Individual)') + '</td>' +
+          '<td class="py-3 px-4 text-xs">' + el.estadoFisico + '</td>' +
+          '<td class="py-3 px-4 text-right font-mono font-semibold">' + el.cantidadTotal + '</td>' +
+          '<td class="py-3 px-4 text-right font-mono font-semibold text-emerald-700">' + disp + '</td>' +
+          '<td class="py-3 px-4 text-right"><button onclick="editarElementoCatalogo(\'' + el.codigo + '\')" class="px-2.5 py-1 text-xs font-medium text-slate-700 border border-slate-300 rounded-md hover:bg-slate-50">Editar</button></td>' +
+        '</tr>';
+      }).join('');
+
+      // 5. Renderizar Vista HISTORIAL
+      document.getElementById('tabla-cierres-body').innerHTML = estadoGlobal.cierres.length === 0
+        ? '<tr><td colspan="5" class="py-6 text-center text-slate-400">Sin cierres firmados aún en Google Sheets.</td></tr>'
+        : estadoGlobal.cierres.map(function(c) {
+            return '<tr>' +
+              '<td class="py-2.5 px-3 font-mono text-xs font-semibold">' + c.id + '</td>' +
+              '<td class="py-2.5 px-3 font-mono text-xs">' + c.fecha + ' ' + c.horaCierre + '</td>' +
+              '<td class="py-2.5 px-3 text-xs">' + c.responsableCorreo + '</td>' +
+              '<td class="py-2.5 px-3 font-mono text-xs text-emerald-700 font-semibold">' + c.selloConfirmacion + '</td>' +
+              '<td class="py-2.5 px-3 text-xs text-slate-600">' + c.observaciones + '</td>' +
+            '</tr>';
+          }).join('');
+
+      const qHist = (document.getElementById('busqueda-hist-nov').value || '').trim().toLowerCase();
+      const fDesde = document.getElementById('hist-fecha-desde').value;
+      const fHasta = document.getElementById('hist-fecha-hasta').value;
+      const histNovs = estadoGlobal.novedades.filter(function(n) {
+        if (fDesde && n.fechaEvento < fDesde) return false;
+        if (fHasta && n.fechaEvento > fHasta) return false;
+        if (qHist) {
+          const txt = (n.id + ' ' + n.elementoCodigo + ' ' + n.solicitanteNombre + ' ' + n.solicitanteDependencia).toLowerCase();
+          if (txt.indexOf(qHist) === -1) return false;
+        }
+        return true;
+      });
+
+      document.getElementById('tabla-hist-consulta-body').innerHTML = histNovs.length === 0
+        ? '<tr><td colspan="5" class="py-6 text-center text-slate-400">Sin registros coincidentes.</td></tr>'
+        : histNovs.map(function(n) {
+            return '<tr>' +
+              '<td class="py-3 px-4 font-mono font-semibold">' + n.id + ' · ' + etiquetaTipo(n.tipo) + ' (' + n.cantidad + ')</td>' +
+              '<td class="py-3 px-4 font-mono">' + n.elementoCodigo + '</td>' +
+              '<td class="py-3 px-4"><div class="font-medium">' + n.solicitanteNombre + '</div><div class="text-slate-500">' + n.solicitanteVinculo + ' · ' + n.solicitanteDependencia + '</div></td>' +
+              '<td class="py-3 px-4 font-mono">' + n.fechaEvento + ' ' + n.horaEvento + '</td>' +
+              '<td class="py-3 px-4">' + (n.estado === 'cerrada' ? '<span class="text-emerald-700 font-medium">Cerrada (' + n.fechaCierre + ')</span>' : '<span class="text-amber-700 font-medium">Sigue abierta</span>') + '</td>' +
+            '</tr>';
+          }).join('');
+
+      document.getElementById('tabla-auditoria-body').innerHTML = estadoGlobal.auditoria.length === 0
+        ? '<tr><td colspan="5" class="py-6 text-center text-slate-400">Sin registros en bitácora aún.</td></tr>'
+        : estadoGlobal.auditoria.map(function(a) {
+            return '<tr>' +
+              '<td class="py-2 px-3 font-mono text-xs text-slate-500">' + a.fechaHora + '</td>' +
+              '<td class="py-2 px-3 text-xs font-mono">' + a.usuarioCorreo + '</td>' +
+              '<td class="py-2 px-3 text-xs font-medium">' + a.modulo + '</td>' +
+              '<td class="py-2 px-3 text-xs">' + a.accion + '</td>' +
+              '<td class="py-2 px-3 text-xs text-slate-600">' + a.detalle + '</td>' +
+            '</tr>';
+          }).join('');
+
+      const selectEl = document.getElementById('nov-elemento');
+      selectEl.innerHTML = elementosActivos.map(function(el) {
+        return '<option value="' + el.codigo + '">' + el.codigo + ' - ' + el.nombre + '</option>';
+      }).join('');
+    }
+
+    function cambiarVista(v) {
+      ['cierre', 'novedades', 'apertura', 'catalogo', 'historial'].forEach(function(id) {
+        document.getElementById('vista-' + id).classList.toggle('hidden', id !== v);
+        document.getElementById('tab-' + id).className = id === v
+          ? 'py-4 border-b-2 border-blue-900 text-slate-900 font-semibold whitespace-nowrap'
+          : 'py-4 border-b-2 border-transparent hover:text-slate-900 whitespace-nowrap';
+      });
+    }
+
+    function marcarChequeoApertura(codigo, valor) {
+      estadoGlobal.chequeoApertura[codigo] = valor;
+      renderizarTodo();
+    }
+
+    function guardarAperturaSheets() {
+      const activos = estadoGlobal.elementos.filter(function(e) { return e.activo !== false; });
+      const difs = activos.filter(function(e) { return estadoGlobal.chequeoApertura[e.codigo] === 'diferencia'; }).length;
+      const obs = document.getElementById('obs-apertura').value.trim();
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run.withSuccessHandler(function() {
+          document.getElementById('obs-apertura').value = '';
+          mostrarAviso('Constancia de apertura registrada en Google Sheets.', 'exito');
+          cargarDatosDesdeSheets();
+        }).registrarAperturaTurno({
+          conforme: difs === 0,
+          revisados: activos.length,
+          diferencias: difs,
+          observaciones: obs
+        });
+      }
+    }
+
+    function toggleCamposOrdenSalida() {
+      const tipo = document.getElementById('nov-tipo').value;
+      document.getElementById('bloque-orden-salida').classList.toggle('hidden', tipo !== 'orden_salida');
+    }
+
+    function abrirModalNovedad(codigoPreseleccionado, cantidadPreseleccionada) {
+      if (codigoPreseleccionado) document.getElementById('nov-elemento').value = codigoPreseleccionado;
+      document.getElementById('nov-cantidad').value = cantidadPreseleccionada || 1;
+      toggleCamposOrdenSalida();
+      document.getElementById('modal-novedad').classList.remove('hidden');
+      document.getElementById('modal-novedad').classList.add('flex');
+    }
+
+    function cerrarModalNovedad() {
+      document.getElementById('modal-novedad').classList.add('hidden');
+      document.getElementById('modal-novedad').classList.remove('flex');
+    }
+
+    function abrirModalCerrarNovedad(id) {
+      const nov = estadoGlobal.novedades.find(function(n) { return n.id === id; });
+      document.getElementById('cerrar-nov-id').value = id;
+      document.getElementById('lbl-cerrar-nov-info').textContent = nov
+        ? (nov.id + ' · ' + nov.elementoCodigo + ' (' + nov.cantidad + ' unid.) · Solicitante: ' + nov.solicitanteNombre)
+        : id;
+      document.getElementById('cerrar-nov-nota').value = '';
+      document.getElementById('modal-cerrar-novedad').classList.remove('hidden');
+      document.getElementById('modal-cerrar-novedad').classList.add('flex');
+    }
+
+    function ocultarModalCerrarNovedad() {
+      document.getElementById('modal-cerrar-novedad').classList.add('hidden');
+      document.getElementById('modal-cerrar-novedad').classList.remove('flex');
+    }
+
+    function confirmarCerrarNovedadSheets() {
+      const id = document.getElementById('cerrar-nov-id').value;
+      const nota = document.getElementById('cerrar-nov-nota').value.trim() || 'Elemento devuelto y verificado en oficina.';
+      ocultarModalCerrarNovedad();
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        mostrarAviso('Cerrando novedad ' + id + ' en Google Sheets...', 'exito');
+        google.script.run.withSuccessHandler(function() {
+          mostrarAviso('Novedad ' + id + ' cerrada correctamente.', 'exito');
+          cargarDatosDesdeSheets();
+        }).cerrarNovedad(id, nota);
+      }
+    }
+
+    function abrirModalElemento() {
+      document.getElementById('titulo-modal-elemento').textContent = 'Agregar nuevo elemento al catálogo';
+      document.getElementById('cat-codigo').value = '';
+      document.getElementById('cat-nombre').value = '';
+      document.getElementById('cat-cantidad').value = '1';
+      document.getElementById('cat-activo').checked = true;
+      document.getElementById('modal-elemento').classList.remove('hidden');
+      document.getElementById('modal-elemento').classList.add('flex');
+    }
+
+    function editarElementoCatalogo(codigo) {
+      const el = estadoGlobal.elementos.find(function(e) { return e.codigo === codigo; });
+      if (!el) return;
+      document.getElementById('titulo-modal-elemento').textContent = 'Editar elemento ' + el.codigo;
+      document.getElementById('cat-codigo').value = el.codigo;
+      document.getElementById('cat-categoria').value = el.categoria;
+      document.getElementById('cat-nombre').value = el.nombre;
+      document.getElementById('cat-tipo').value = el.tipo;
+      document.getElementById('cat-cantidad').value = el.cantidadTotal;
+      document.getElementById('cat-ubicacion').value = el.ubicacion;
+      document.getElementById('cat-estado-fisico').value = el.estadoFisico;
+      document.getElementById('cat-activo').checked = el.activo !== false;
+      document.getElementById('modal-elemento').classList.remove('hidden');
+      document.getElementById('modal-elemento').classList.add('flex');
+    }
+
+    function cerrarModalElemento() {
+      document.getElementById('modal-elemento').classList.add('hidden');
+      document.getElementById('modal-elemento').classList.remove('flex');
+    }
+
+    function guardarNovedadSheets() {
+      const payload = {
+        elementoCodigo: document.getElementById('nov-elemento').value,
+        tipo: document.getElementById('nov-tipo').value,
+        cantidad: Number(document.getElementById('nov-cantidad').value || 1),
+        solicitanteNombre: document.getElementById('nov-solicitante').value.trim(),
+        solicitanteDocumento: document.getElementById('nov-documento').value.trim(),
+        solicitanteVinculo: document.getElementById('nov-vinculo').value,
+        solicitanteDependencia: document.getElementById('nov-dependencia').value.trim(),
+        eventoOrdenSalida: document.getElementById('nov-evento').value.trim(),
+        referenciaAutorizacionExterna: document.getElementById('nov-referencia').value.trim(),
+        observaciones: document.getElementById('nov-obs').value.trim()
+      };
+      if (!payload.solicitanteNombre) {
+        mostrarAviso('Por favor ingrese el nombre del solicitante.', 'error');
+        return;
+      }
+      cerrarModalNovedad();
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        mostrarAviso('Guardando novedad en Google Sheets...', 'exito');
+        google.script.run.withSuccessHandler(function() {
+          mostrarAviso('Novedad guardada en Google Sheets.', 'exito');
+          cargarDatosDesdeSheets();
+        }).registrarNovedad(payload);
+      }
+    }
+
+    function guardarElementoSheets() {
+      const payload = {
+        codigo: document.getElementById('cat-codigo').value.trim().toUpperCase(),
+        categoria: document.getElementById('cat-categoria').value,
+        nombre: document.getElementById('cat-nombre').value.trim(),
+        tipo: document.getElementById('cat-tipo').value.trim(),
+        cantidadTotal: Number(document.getElementById('cat-cantidad').value || 1),
+        ubicacion: document.getElementById('cat-ubicacion').value.trim(),
+        estadoFisico: document.getElementById('cat-estado-fisico').value,
+        activo: document.getElementById('cat-activo').checked
+      };
+      if (!payload.codigo || !payload.nombre) return;
+      cerrarModalElemento();
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run.withSuccessHandler(function() {
+          mostrarAviso('Catálogo actualizado en Google Sheets.', 'exito');
+          cargarDatosDesdeSheets();
+        }).guardarElemento(payload);
+      }
+    }
+
+    function confirmarYFirmarCierre() {
+      const abiertasPorCodigo = obtenerAbiertasPorCodigo();
+      const ahora = new Date().toTimeString().slice(0, 5);
+      const detalles = estadoGlobal.elementos.filter(function(e) { return e.activo !== false; }).map(function(el) {
+        const abiertas = abiertasPorCodigo[el.codigo] || [];
+        const enOficina = el.categoria !== 'deportivo'
+          ? (estadoGlobal.decisionAudiovisual[el.codigo] === 'en_oficina' ? 1 : 0)
+          : (estadoGlobal.conteoDeportivo[el.codigo] ? estadoGlobal.conteoDeportivo[el.codigo].enOficina : el.cantidadTotal);
+        const afuera = Math.max(0, el.cantidadTotal - enOficina);
+        return {
+          elementoCodigo: el.codigo,
+          resultado: afuera === 0 ? 'en_oficina' : 'no_esta',
+          unidadesEnOficina: enOficina,
+          unidadesAfuera: afuera,
+          novedadIds: abiertas.map(function(n) { return n.id; })
+        };
+      });
+
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        document.getElementById('btn-firmar').textContent = 'Firmando en Google Sheets...';
+        document.getElementById('btn-firmar').disabled = true;
+        google.script.run.withSuccessHandler(function(res) {
+          mostrarAviso('Acta de cierre firmada y bloqueada en Google Sheets (' + res.sello + ').', 'exito');
+          cargarDatosDesdeSheets();
+        }).firmarCierreDiario({
+          fecha: hoyISO,
+          horaCierre: ahora,
+          observaciones: document.getElementById('obs-cierre').value,
+          detalles: detalles
+        });
+      }
+    }
+
+    function notificarJefaturaSheets() {
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run.withSuccessHandler(function() {
+          mostrarAviso('Alerta de escalamiento registrada y enviada a Jefatura (RF-13).', 'exito');
+          cargarDatosDesdeSheets();
+        }).enviarAlertaJefatura('', estadoGlobal.umbralEscalamientoDias);
+      }
+    }
+
+    function descargarCsv(nombre, cabeceras, filas) {
+      const esc = function(v) { return '"' + String(v || '').replace(/"/g, '""') + '"'; };
+      const csv = [cabeceras.map(esc).join(',')].concat(filas.map(function(f) { return f.map(esc).join(','); })).join('\n');
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = nombre;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    function descargarCsvCierre() {
+      const abiertasPorCodigo = obtenerAbiertasPorCodigo();
+      const filas = estadoGlobal.elementos.map(function(el) {
+        const abiertas = abiertasPorCodigo[el.codigo] || [];
+        const enOficina = el.categoria !== 'deportivo'
+          ? (estadoGlobal.decisionAudiovisual[el.codigo] === 'en_oficina' ? 1 : 0)
+          : (estadoGlobal.conteoDeportivo[el.codigo] ? estadoGlobal.conteoDeportivo[el.codigo].enOficina : el.cantidadTotal);
+        return [hoyISO, el.codigo, el.nombre, el.categoria, el.cantidadTotal, enOficina, el.cantidadTotal - enOficina, abiertas.map(function(n) { return n.id; }).join('; ')];
+      });
+      descargarCsv('Detalle_Inventario_' + hoyISO + '.csv', ['Fecha', 'Codigo', 'Nombre', 'Categoria', 'Total', 'En_Oficina', 'Afuera', 'Novedades'], filas);
+    }
+
+    function descargarCsvCatalogo() {
+      const filas = estadoGlobal.elementos.map(function(el) {
+        return [el.codigo, el.nombre, el.categoria, el.tipo, el.estadoFisico, el.activo ? 'SI' : 'NO', el.cantidadTotal, el.ubicacion];
+      });
+      descargarCsv('Catalogo_Elementos.csv', ['Codigo', 'Nombre', 'Categoria', 'Tipo', 'Estado_Fisico', 'Activo', 'Cantidad_Total', 'Ubicacion'], filas);
+    }
+
+    window.addEventListener('DOMContentLoaded', cargarDatosDesdeSheets);
+  </script>
+</body>
+</html>

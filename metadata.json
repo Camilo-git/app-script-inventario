@@ -1,0 +1,8 @@
+{
+  "name": "Media Office Inventory Tracker",
+  "description": "Digitalize daily equipment audits, track loans, and manage inventory discrepancies with a traceable, signed reporting system.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
